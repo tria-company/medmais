@@ -1,0 +1,21 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: var(--font-urbanist), ui-sans-serif, system-ui, sans-serif;
+  --animate-blink-dot: blink-dot 1.5s ease-in-out infinite;
+
+  @keyframes blink-dot {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.35;
+    }
+  }
+}
+
+html,
+body {
+  font-family: var(--font-urbanist), ui-sans-serif, system-ui, sans-serif;
+}
