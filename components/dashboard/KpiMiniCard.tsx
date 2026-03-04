@@ -102,13 +102,35 @@ function Icon({
     case "cash":
     default:
       return (
-        <Image
-          src="/icons/kpi-custo-atual.png"
-          alt="Ícone de custo atual"
-          width={40}
-          height={40}
-          priority
-        />
+        <svg
+          viewBox="0 0 24 24"
+          aria-hidden
+          className="h-7 w-7"
+        >
+          <rect
+            x="2"
+            y="5"
+            width="20"
+            height="14"
+            rx="2"
+            fill="currentColor"
+            opacity="0.16"
+          />
+          <circle
+            cx="12"
+            cy="12"
+            r="3"
+            stroke="currentColor"
+            strokeWidth="1.6"
+            fill="none"
+          />
+          <path
+            d="M6 9V9.01M18 15v.01"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+          />
+        </svg>
       );
   }
 }
