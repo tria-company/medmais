@@ -95,34 +95,31 @@ export function ModalDetalhesCard({
             <p className="text-sm text-slate-500">Nenhum dado disponível.</p>
           ) : !data.itens.length ? (
             <>
-              <p className="text-sm text-slate-500">
-                {data.cardKey === "Total Descontos"
-                  ? "Não há detalhamento por tipo de desconto (itens CCT x contrato)."
-                  : "Não há detalhamento por tipo de provento (itens CCT x contrato)."}
-              </p>
-              {(data.cardKey === "Total Proventos" || data.cardKey === "Total Descontos") && (
-                <div className="mt-6 border-t border-slate-200 pt-4">
+              {rankingTotais.length > 0 ? (
+                <div>
                   <h3 className="mb-3 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-                    {data.cardKey === "Total Descontos"
-                      ? "Descontos irregulares por colaborador (Total Descontos)"
-                      : "Proventos irregulares por colaborador (Total Proventos)"}
+                    Comparativo por colaborador — {data.cardLabel}
                   </h3>
                   <p className="mb-3 text-xs text-slate-600">
                     Valores conforme total por colaborador (comparação Atual x CCT).
                   </p>
                   <div className="grid gap-4 md:grid-cols-2">
                     <TabelaRankingColaboradoresTotais
-                      titulo={data.cardKey === "Total Descontos" ? "Descontos a mais (acima da CCT)" : "Pagos a mais (acima da CCT)"}
+                      titulo="Acima da CCT"
                       rows={pagosAMais}
-                      emptyMessage={data.cardKey === "Total Descontos" ? "Nenhum colaborador com descontos a mais." : "Nenhum colaborador com proventos pagos a mais."}
+                      emptyMessage="Nenhum colaborador acima da CCT."
                     />
                     <TabelaRankingColaboradoresTotais
-                      titulo={data.cardKey === "Total Descontos" ? "Descontos abaixo/irregulares (abaixo da CCT)" : "Pagos abaixo/irregulares (abaixo da CCT)"}
+                      titulo="Abaixo da CCT"
                       rows={pagosAbaixo}
-                      emptyMessage={data.cardKey === "Total Descontos" ? "Nenhum colaborador com descontos abaixo." : "Nenhum colaborador com proventos pagos abaixo."}
+                      emptyMessage="Nenhum colaborador abaixo da CCT."
                     />
                   </div>
                 </div>
+              ) : (
+                <p className="text-sm text-slate-500">
+                  Nenhum dado disponível para detalhamento.
+                </p>
               )}
             </>
           ) : (

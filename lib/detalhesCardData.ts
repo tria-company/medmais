@@ -205,6 +205,78 @@ export function getDetalhesCardData(
         }
       }
     }
+
+    // Consolida itens similares em categorias (ex: "FERIAS", "1/3 FERIAS MS" → "Férias")
+    const PROVENTO_CATEGORIES: { category: string; test: (n: string) => boolean }[] = [
+      { category: "Férias", test: (n) => /F[EÉ]RIAS/i.test(n) },
+      { category: "Horas Extras", test: (n) => /HORA\s*EXTRA|H\.?\s*EXTRA/i.test(n) },
+      { category: "Adicional Noturno", test: (n) => /NOTURNO/i.test(n) },
+      { category: "Insalubridade", test: (n) => /INSALUBR/i.test(n) },
+      { category: "Periculosidade", test: (n) => /PERICUL/i.test(n) },
+      { category: "Vale Transporte", test: (n) => /VALE\s*TRANSP/i.test(n) },
+      { category: "Gratificações", test: (n) => /GRATIF/i.test(n) },
+      { category: "Salário", test: (n) => /SAL[AÁ]RIO/i.test(n) },
+    ];
+
+    function getProventoCategory(itemName: string): string {
+      for (const cat of PROVENTO_CATEGORIES) {
+        if (cat.test(itemName)) return cat.category;
+      }
+      return itemName; // sem categoria conhecida, mantém o nome original
+    }
+
+    // Agrupar agregadoPorItem por categoria
+    const groupedAgregado = new Map<string, { atual: number; contrato: number; cct: number }>();
+    for (const [item, agg] of agregadoPorItem) {
+      const category = getProventoCategory(item);
+      if (!groupedAgregado.has(category)) {
+        groupedAgregado.set(category, { atual: 0, contrato: 0, cct: 0 });
+      }
+      const g = groupedAgregado.get(category)!;
+      g.atual += agg.atual;
+      g.contrato += agg.contrato;
+      g.cct += agg.cct;
+    }
+    agregadoPorItem.clear();
+    for (const [cat, agg] of groupedAgregado) {
+      agregadoPorItem.set(cat, agg);
+    }
+
+    // Agrupar rankingPorItem por categoria (merge por colaborador)
+    const groupedRanking = new Map<string, Map<string, RankingColaboradorItem>>();
+    for (const [item, rankings] of rankingPorItem) {
+      const category = getProventoCategory(item);
+      if (!groupedRanking.has(category)) {
+        groupedRanking.set(category, new Map());
+      }
+      const colabMap = groupedRanking.get(category)!;
+      for (const r of rankings) {
+        if (!colabMap.has(r.colaboradorId)) {
+          colabMap.set(r.colaboradorId, {
+            colaboradorId: r.colaboradorId,
+            nome: r.nome,
+            diferenca: 0,
+            valorAtual: 0,
+            valorContrato: 0,
+            valorCct: 0,
+          });
+        }
+        const existing = colabMap.get(r.colaboradorId)!;
+        existing.valorAtual += r.valorAtual;
+        existing.valorContrato += r.valorContrato;
+        existing.valorCct += r.valorCct;
+        existing.diferenca += r.diferenca;
+      }
+    }
+    rankingPorItem.clear();
+    for (const [cat, colabMap] of groupedRanking) {
+      const entries = Array.from(colabMap.values()).filter(
+        (r) => Math.abs(r.diferenca) > 1e-6,
+      );
+      if (entries.length > 0) {
+        rankingPorItem.set(cat, entries);
+      }
+    }
   } else if (cardKey === "Total Descontos") {
     // Para descontos seguimos a mesma ideia: usamos SEMPRE os itens da folha_cct.descontos
     // para montar os cards, e o Atual vem da folha_atual.descontos quando existir,
@@ -313,108 +385,153 @@ export function getDetalhesCardData(
         }
       }
     }
+
+    // Consolida itens similares em categorias (ex: "LIQUIDO FERIAS", "IR.FERIAS" → "Férias")
+    const DESCONTO_CATEGORIES: { category: string; test: (n: string) => boolean }[] = [
+      { category: "Férias", test: (n) => /F[EÉ]RIAS/i.test(n) },
+      { category: "INSS", test: (n) => /^INSS\b/i.test(n) },
+      { category: "IRRF", test: (n) => /^IR$|^IR\b.*\bbase\b|^IRRF/i.test(n) },
+      { category: "Empréstimo Consignado", test: (n) => /CONSIGNADO|EMPRESTIMO/i.test(n) },
+      { category: "Assistência Médica", test: (n) => /ASSIST\.?\s*MED/i.test(n) },
+      { category: "Assistência Odontológica", test: (n) => /ASSIST\.?\s*ODONT/i.test(n) },
+      { category: "Mensalidade Sindical", test: (n) => /SINDICAL/i.test(n) },
+      { category: "Pensão Alimentícia", test: (n) => /PENS[AÃ]O|ALIMENTIC/i.test(n) },
+      { category: "Vale Transporte", test: (n) => /VALE\s*TRANSP|DESC\.?\s*VT|Desconto\s+VT/i.test(n) },
+      { category: "Vale Refeição", test: (n) => /Desconto\s+VR/i.test(n) },
+      { category: "Faltas/Atrasos", test: (n) => /FALTA/i.test(n) },
+    ];
+
+    function getDescontoCategory(itemName: string): string {
+      for (const cat of DESCONTO_CATEGORIES) {
+        if (cat.test(itemName)) return cat.category;
+      }
+      return itemName;
+    }
+
+    const groupedDescontoAgregado = new Map<string, { atual: number; contrato: number; cct: number }>();
+    for (const [item, agg] of agregadoPorItem) {
+      const category = getDescontoCategory(item);
+      if (!groupedDescontoAgregado.has(category)) {
+        groupedDescontoAgregado.set(category, { atual: 0, contrato: 0, cct: 0 });
+      }
+      const g = groupedDescontoAgregado.get(category)!;
+      g.atual += agg.atual;
+      g.contrato += agg.contrato;
+      g.cct += agg.cct;
+    }
+    agregadoPorItem.clear();
+    for (const [cat, agg] of groupedDescontoAgregado) {
+      agregadoPorItem.set(cat, agg);
+    }
+
+    const groupedDescontoRanking = new Map<string, Map<string, RankingColaboradorItem>>();
+    for (const [item, rankings] of rankingPorItem) {
+      const category = getDescontoCategory(item);
+      if (!groupedDescontoRanking.has(category)) {
+        groupedDescontoRanking.set(category, new Map());
+      }
+      const colabMap = groupedDescontoRanking.get(category)!;
+      for (const r of rankings) {
+        if (!colabMap.has(r.colaboradorId)) {
+          colabMap.set(r.colaboradorId, {
+            colaboradorId: r.colaboradorId,
+            nome: r.nome,
+            diferenca: 0,
+            valorAtual: 0,
+            valorContrato: 0,
+            valorCct: 0,
+          });
+        }
+        const existing = colabMap.get(r.colaboradorId)!;
+        existing.valorAtual += r.valorAtual;
+        existing.valorContrato += r.valorContrato;
+        existing.valorCct += r.valorCct;
+        existing.diferenca += r.diferenca;
+      }
+    }
+    rankingPorItem.clear();
+    for (const [cat, colabMap] of groupedDescontoRanking) {
+      const entries = Array.from(colabMap.values()).filter(
+        (r) => Math.abs(r.diferenca) > 1e-6,
+      );
+      if (entries.length > 0) {
+        rankingPorItem.set(cat, entries);
+      }
+    }
   } else if (cardKey === "Total Encargos") {
-    // Para encargos, combinamos TUDO que é encargo:
-    // - Itens da CCT (folha_cct.encargos) com seus contratos/discrepâncias
-    // - Itens que existem apenas na folha_atual.encargos (ex.: INSS Patronal, FGTS, Terceiros, Acidente de Trabalho)
-    //   assumindo CCT = 0 nesses casos.
+    // Lê encargos das 3 colunas separadas: folha_atual, folha_contrato, folha_cct.
+    // Normaliza nomes para fazer matching entre fontes (ex: "INSS Patronal" ↔ "INSS Patronal (20%)").
+    function normalizeEncargoKey(name: string): string {
+      return name.replace(/\s*\(\d+\.?\d*%\)\s*$/, "").trim();
+    }
+
+    // Mapas com chave normalizada para agregar valores e encontrar o melhor nome de exibição
+    const normalizedAgregado = new Map<string, { atual: number; contrato: number; cct: number }>();
+    const bestDisplayNames = new Map<string, string>();
+    const normalizedRanking = new Map<string, RankingColaboradorItem[]>();
+
     for (const colab of colaboradores) {
-      const folha = colab.folhaCctContrato;
-      if (!folha) continue;
+      // --- Atual: folhaCctContrato.folha_atual já é o objeto interno com encargos ---
+      const folhaAtual: any = colab.folhaCctContrato?.folha_atual ?? null;
+      const encargosAtual: any[] = folhaAtual?.encargos ?? [];
 
-      const encargosCct = folha.folha_cct?.encargos ?? [];
-      // Folha atual pode vir acoplada em folhaCctContrato.folha_atual
-      // ou, em alguns casos, diretamente no colaborador (colab as any).folha_atual.
-      const folhaAtual: any =
-        (folha as any).folha_atual ?? (colab as any).folha_atual ?? null;
-      const encargosAtuais = (folhaAtual?.encargos as any[]) ?? [];
+      // --- Contrato: coluna folha_contrato (encargos direto em .encargos) ---
+      const encargosContrato = colab.folhaContrato?.encargos ?? [];
 
-      const atualPorItem = new Map<string, number>();
-      for (const enc of encargosAtuais) {
-        if (!enc || !enc.item) continue;
-        const nomeItem = enc.item;
-        const valor = typeof enc.valor === "number" ? enc.valor : 0;
-        atualPorItem.set(nomeItem, (atualPorItem.get(nomeItem) ?? 0) + valor);
+      // --- CCT: coluna folha_cct (encargos direto em .encargos) ---
+      const encargosCctArr = colab.folhaCct?.encargos ?? [];
+
+      // Mapas por fonte: chave normalizada → valor
+      const atualMap = new Map<string, number>();
+      for (const enc of encargosAtual) {
+        if (!enc?.item) continue;
+        const key = normalizeEncargoKey(enc.item);
+        const val = typeof enc.valor === "number" ? enc.valor : 0;
+        atualMap.set(key, (atualMap.get(key) ?? 0) + val);
+        if (!bestDisplayNames.has(key)) bestDisplayNames.set(key, enc.item);
       }
 
-      const discsMap = new Map<string, FolhaCctContratoDiscrepanciaItem>();
-      for (const disc of folha.discrepancias?.itens ?? []) {
-        if (!disc || !disc.item) continue;
-        discsMap.set(disc.item, disc);
+      const contratoMap = new Map<string, number>();
+      for (const enc of encargosContrato) {
+        if (!enc?.item) continue;
+        const key = normalizeEncargoKey(enc.item);
+        const val = typeof enc.valor === "number" ? enc.valor : 0;
+        contratoMap.set(key, (contratoMap.get(key) ?? 0) + val);
+        // Nome do contrato tem prioridade sobre Atual
+        bestDisplayNames.set(key, enc.item);
       }
 
-      const tratados = new Set<string>();
+      const cctMap = new Map<string, number>();
+      for (const enc of encargosCctArr) {
+        if (!enc?.item) continue;
+        const key = normalizeEncargoKey(enc.item);
+        const val = typeof enc.valor === "number" ? enc.valor : 0;
+        cctMap.set(key, (cctMap.get(key) ?? 0) + val);
+        // Nome da CCT tem maior prioridade (mais descritivo)
+        bestDisplayNames.set(key, enc.item);
+      }
 
-      // 1) Encargos que existem na CCT
-      for (const encCct of encargosCct) {
-        if (!encCct || !encCct.item) continue;
-        const nomeItem = encCct.item;
-        tratados.add(nomeItem);
-        const baseCct =
-          typeof encCct.valor === "number" ? encCct.valor : 0;
+      // Agrega todos os itens únicos deste colaborador
+      const allKeys = new Set([...atualMap.keys(), ...contratoMap.keys(), ...cctMap.keys()]);
+      for (const key of allKeys) {
+        const valorAtual = atualMap.get(key) ?? 0;
+        const valorContrato = contratoMap.get(key) ?? 0;
+        const valorCct = cctMap.get(key) ?? 0;
 
-        const disc = discsMap.get(nomeItem);
-        const valorContrato =
-          disc && typeof disc.valor_contrato === "number"
-            ? disc.valor_contrato
-            : baseCct;
-        const valorCct = baseCct;
-        const valorAtual = atualPorItem.get(nomeItem) ?? valorContrato;
-        const diferenca = valorCct - valorAtual;
-
-        if (!agregadoPorItem.has(nomeItem)) {
-          agregadoPorItem.set(nomeItem, { atual: 0, contrato: 0, cct: 0 });
+        if (!normalizedAgregado.has(key)) {
+          normalizedAgregado.set(key, { atual: 0, contrato: 0, cct: 0 });
         }
-        const agg = agregadoPorItem.get(nomeItem)!;
+        const agg = normalizedAgregado.get(key)!;
         agg.atual += valorAtual;
         agg.contrato += valorContrato;
         agg.cct += valorCct;
 
-        if (Math.abs(diferenca) > 1e-6) {
-          let ranking = rankingPorItem.get(nomeItem);
-          if (!ranking) {
-            ranking = [];
-            rankingPorItem.set(nomeItem, ranking);
-          }
-          ranking.push({
-            colaboradorId: colab.id,
-            nome: colab.nome,
-            diferenca,
-            valorAtual,
-            valorContrato,
-            valorCct,
-          });
-        }
-      }
-
-      // 2) Encargos que existem apenas na folha_atual (sem item correspondente na CCT)
-      //    Ex.: INSS Patronal, FGTS (8%), Terceiros, Acidente de Trabalho.
-      for (const enc of encargosAtuais) {
-        if (!enc || !enc.item) continue;
-        const nomeItem = enc.item;
-        if (tratados.has(nomeItem)) continue;
-
-        const valorAtual =
-          typeof enc.valor === "number" && Number.isFinite(enc.valor)
-            ? enc.valor
-            : 0;
-        const valorContrato = valorAtual;
-        const valorCct = 0;
         const diferenca = valorCct - valorAtual;
-
-        if (!agregadoPorItem.has(nomeItem)) {
-          agregadoPorItem.set(nomeItem, { atual: 0, contrato: 0, cct: 0 });
-        }
-        const agg = agregadoPorItem.get(nomeItem)!;
-        agg.atual += valorAtual;
-        agg.contrato += valorContrato;
-        agg.cct += valorCct;
-
         if (Math.abs(diferenca) > 1e-6) {
-          let ranking = rankingPorItem.get(nomeItem);
+          let ranking = normalizedRanking.get(key);
           if (!ranking) {
             ranking = [];
-            rankingPorItem.set(nomeItem, ranking);
+            normalizedRanking.set(key, ranking);
           }
           ranking.push({
             colaboradorId: colab.id,
@@ -428,96 +545,64 @@ export function getDetalhesCardData(
       }
     }
 
-    // Garante que encargos padrão apareçam sempre como cards mesmo sem dados.
-    for (const nome of ["INSS Patronal", "FGTS (8%)"]) {
-      if (!agregadoPorItem.has(nome)) {
-        agregadoPorItem.set(nome, { atual: 0, contrato: 0, cct: 0 });
-      }
+    // Converte chaves normalizadas para nomes de exibição
+    for (const [key, agg] of normalizedAgregado) {
+      const displayName = bestDisplayNames.get(key) ?? key;
+      agregadoPorItem.set(displayName, agg);
     }
-
-    // "Terceiros" e "Acidente de Trabalho" existem APENAS em folha_atual —
-    // nunca possuem valor de contrato ou CCT. Recomputamos sempre a soma do
-    // atual diretamente de folha_atual.encargos, sobrescrevendo qualquer valor
-    // incorreto que possa ter ficado de sections 1 ou 2.
-    for (const nomeEncargo of ["Terceiros", "Acidente de Trabalho"]) {
-      let somaAtual = 0;
-      const rankingEncargo: RankingColaboradorItem[] = [];
-
-      for (const colab of colaboradores) {
-        const folha = colab.folhaCctContrato;
-        const folhaAtualLocal: any =
-          (folha as any).folha_atual ?? (colab as any).folha_atual ?? null;
-        const encargosAtuaisLocal: any[] =
-          (folhaAtualLocal?.encargos as any[]) ?? [];
-
-        for (const enc of encargosAtuaisLocal) {
-          if (!enc || enc.item !== nomeEncargo) continue;
-          const valor =
-            typeof enc.valor === "number" && Number.isFinite(enc.valor)
-              ? enc.valor
-              : 0;
-          somaAtual += valor;
-          if (valor > 1e-6) {
-            rankingEncargo.push({
-              colaboradorId: colab.id,
-              nome: colab.nome,
-              valorAtual: valor,
-              valorContrato: 0,
-              valorCct: 0,
-              diferenca: -valor,
-            });
-          }
-        }
-      }
-
-      agregadoPorItem.set(nomeEncargo, { atual: somaAtual, contrato: 0, cct: 0 });
-      if (rankingEncargo.length > 0) {
-        rankingPorItem.set(nomeEncargo, rankingEncargo);
-      }
+    for (const [key, ranking] of normalizedRanking) {
+      const displayName = bestDisplayNames.get(key) ?? key;
+      rankingPorItem.set(displayName, ranking);
     }
-  } else {
-    // Para os demais cards (Descontos, Encargos, Custos Empresa),
-    // usamos as discrepâncias por item do contrato x CCT.
-    if (!categoria) {
-      return {
-        cardKey,
-        cardLabel,
-        itens: [],
-        rankingPorItem,
-        rankingColaboradoresTotais: [],
-      };
-    }
-
+  } else if (cardKey === "Total Custos Empresa") {
+    // Lê custos_empresa das 3 colunas separadas: folha_atual, folha_contrato, folha_cct.
     for (const colab of colaboradores) {
-      const folha = colab.folhaCctContrato;
-      const discs = folha?.discrepancias?.itens ?? [];
+      const folhaAtual: any = colab.folhaCctContrato?.folha_atual ?? null;
+      const custosAtual: any[] = folhaAtual?.custos_empresa ?? [];
+      const custosContrato = colab.folhaContrato?.custos_empresa ?? [];
+      const custosCct = colab.folhaCct?.custos_empresa ?? [];
 
-      for (const disc of discs) {
-        if (!disc || !discrepanciaPertenceAoCard(cardKey, disc)) continue;
+      const atualMap = new Map<string, number>();
+      for (const c of custosAtual) {
+        if (!c?.item) continue;
+        const val = typeof c.valor === "number" ? c.valor : 0;
+        atualMap.set(c.item, (atualMap.get(c.item) ?? 0) + val);
+      }
 
-        const nomeItem = disc.item ?? "";
-        if (!nomeItem) continue;
+      const contratoMap = new Map<string, number>();
+      for (const c of custosContrato) {
+        if (!c?.item) continue;
+        const val = typeof c.valor === "number" ? c.valor : 0;
+        contratoMap.set(c.item, (contratoMap.get(c.item) ?? 0) + val);
+      }
 
-        const valorContrato =
-          typeof disc.valor_contrato === "number" ? disc.valor_contrato : 0;
-        const valorCct =
-          typeof disc.valor_cct === "number" ? disc.valor_cct : 0;
-        const valorAtual = valorContrato;
-        const diferenca = valorCct - valorContrato;
+      const cctMap = new Map<string, number>();
+      for (const c of custosCct) {
+        if (!c?.item) continue;
+        const val = typeof c.valor === "number" ? c.valor : 0;
+        cctMap.set(c.item, (cctMap.get(c.item) ?? 0) + val);
+      }
 
-        if (!agregadoPorItem.has(nomeItem)) {
-          agregadoPorItem.set(nomeItem, { atual: 0, contrato: 0, cct: 0 });
+      const allKeys = new Set([...atualMap.keys(), ...contratoMap.keys(), ...cctMap.keys()]);
+      for (const key of allKeys) {
+        const valorAtual = atualMap.get(key) ?? 0;
+        const valorContrato = contratoMap.get(key) ?? 0;
+        const valorCct = cctMap.get(key) ?? 0;
+
+        if (!agregadoPorItem.has(key)) {
+          agregadoPorItem.set(key, { atual: 0, contrato: 0, cct: 0 });
         }
-        const agg = agregadoPorItem.get(nomeItem)!;
+        const agg = agregadoPorItem.get(key)!;
         agg.atual += valorAtual;
         agg.contrato += valorContrato;
         agg.cct += valorCct;
 
+        const diferenca = valorCct - valorAtual;
         if (Math.abs(diferenca) > 1e-6) {
-          let ranking = rankingPorItem.get(nomeItem);
+          let ranking = rankingPorItem.get(key);
           if (!ranking) {
             ranking = [];
-            rankingPorItem.set(nomeItem, ranking);
+            rankingPorItem.set(key, ranking);
           }
           ranking.push({
             colaboradorId: colab.id,

@@ -3,6 +3,7 @@ import type {
   ComparacaoTotal,
   FolhaDePagamentoIaDuplicateRow,
   FolhaCctContrato,
+  FolhaCct,
 } from "../types";
 
 export interface VisaoExecutivaColaborador {
@@ -17,6 +18,8 @@ export interface VisaoExecutivaColaborador {
   impactoAnual: number;
   comparacaoTotais: ComparacaoTotal[];
   folhaCctContrato: FolhaCctContrato | null;
+  folhaContrato: FolhaCct | null;
+  folhaCct: FolhaCct | null;
 }
 
 export async function getVisaoExecutivaPorColaborador(): Promise<
@@ -25,7 +28,7 @@ export async function getVisaoExecutivaPorColaborador(): Promise<
   const { data, error } = await supabaseClient
     .from("folha_de_pagamento_ia_duplicate")
     .select(
-      "id, nome, funcao, cpf, matricula, competencia, comparacao_totais, dashboard_data, folha_cct_contrato, folha_atual",
+      "id, nome, funcao, cpf, matricula, competencia, comparacao_totais, dashboard_data, folha_atual, folha_contrato, folha_cct",
     )
     .not("comparacao_totais", "is", null)
     .not("dashboard_data", "is", null)
@@ -41,17 +44,21 @@ export async function getVisaoExecutivaPorColaborador(): Promise<
     .map((row) => {
       const nome = row.nome ?? "Sem nome";
       const comparacoes = (row.comparacao_totais ?? []) as ComparacaoTotal[];
-      const baseFolhaCctContrato = (row.folha_cct_contrato ?? null) as
-        | FolhaCctContrato
-        | null;
 
-      // Alguns dados de folha_atual vêm na raiz da linha; acoplamos esses dados
-      // dentro de folhaCctContrato.folha_atual para facilitar o consumo nos detalhes.
+      // Reconstrói folhaCctContrato a partir das colunas separadas
+      // para manter compatibilidade com o restante do código.
+      const folhaCctCol = (row.folha_cct as FolhaCct | null) ?? null;
+      // A coluna folha_atual tem estrutura { folha_atual: { proventos, encargos, totais, ... } }
+      // Extraímos o objeto interno para compatibilidade com o código existente.
+      const folhaAtualRaw: any = row.folha_atual ?? null;
+      const folhaAtualInner = (folhaAtualRaw?.folha_atual ?? folhaAtualRaw) as
+        | import("../types").FolhaAtual
+        | null;
       const mergedFolhaCctContrato: FolhaCctContrato | null =
-        baseFolhaCctContrato || row.folha_atual
+        folhaCctCol || folhaAtualInner
           ? {
-              ...(baseFolhaCctContrato ?? {}),
-              folha_atual: row.folha_atual ?? baseFolhaCctContrato?.folha_atual,
+              folha_cct: folhaCctCol ?? undefined,
+              folha_atual: folhaAtualInner ?? undefined,
             }
           : null;
 
@@ -75,6 +82,8 @@ export async function getVisaoExecutivaPorColaborador(): Promise<
         impactoAnual: row.dashboard_data.impacto_anual,
         comparacaoTotais: comparacoes,
         folhaCctContrato: mergedFolhaCctContrato,
+        folhaContrato: (row.folha_contrato as FolhaCct | null) ?? null,
+        folhaCct: (row.folha_cct as FolhaCct | null) ?? null,
       } satisfies VisaoExecutivaColaborador;
     })
     .filter((item): item is VisaoExecutivaColaborador => item !== null);

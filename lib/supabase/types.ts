@@ -109,6 +109,8 @@ export interface FolhaDePagamentoIaDuplicateRow {
   discrepancias: Discrepancia[] | null;
   folha_cct_contrato?: FolhaCctContrato | null;
   folha_atual?: FolhaAtual | null;
+  folha_contrato?: FolhaCct | null;
+  folha_cct?: FolhaCct | null;
   nome?: string;
   funcao?: string;
   cpf?: string;
