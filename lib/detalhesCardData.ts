@@ -175,6 +175,8 @@ function collectThreeColumns(
   agregadoPorItem: Map<string, { atual: number; contrato: number; cct: number }>,
   rankingPorItem: Map<string, RankingColaboradorItem[]>,
   normalizeKeyFn?: (name: string) => string,
+  /** Categorias adicionais da folha para incluir junto (ex: "beneficios") */
+  extraCategorias?: ("proventos" | "descontos" | "encargos" | "custos_empresa" | "beneficios")[],
 ): Map<string, string> | undefined {
   const normalize = normalizeKeyFn ?? ((n: string) => n);
   // bestDisplayNames é usado apenas quando há normalização de chave
@@ -183,13 +185,22 @@ function collectThreeColumns(
   for (const colab of colaboradores) {
     // --- Atual: folhaCctContrato.folha_atual (já é o objeto interno) ---
     const folhaAtual: any = colab.folhaCctContrato?.folha_atual ?? null;
-    const itensAtual: any[] = folhaAtual?.[categoriaFolha] ?? [];
+    const itensAtual: any[] = [
+      ...(folhaAtual?.[categoriaFolha] ?? []),
+      ...(extraCategorias?.flatMap((cat) => folhaAtual?.[cat] ?? []) ?? []),
+    ];
 
     // --- Contrato: coluna folha_contrato ---
-    const itensContrato = colab.folhaContrato?.[categoriaFolha] ?? [];
+    const itensContrato = [
+      ...(colab.folhaContrato?.[categoriaFolha] ?? []),
+      ...(extraCategorias?.flatMap((cat) => (colab.folhaContrato as any)?.[cat] ?? []) ?? []),
+    ];
 
     // --- CCT: coluna folha_cct ---
-    const itensCct = colab.folhaCct?.[categoriaFolha] ?? [];
+    const itensCct = [
+      ...(colab.folhaCct?.[categoriaFolha] ?? []),
+      ...(extraCategorias?.flatMap((cat) => (colab.folhaCct as any)?.[cat] ?? []) ?? []),
+    ];
 
     const atualMap = new Map<string, number>();
     for (const item of itensAtual) {
@@ -325,7 +336,10 @@ export function getDetalhesCardData(
       for (const [k, v] of resolvedRank) rankingPorItem.set(k, v);
     }
   } else if (cardKey === "Total Custos Empresa") {
-    collectThreeColumns(colaboradores, "custos_empresa", agregadoPorItem, rankingPorItem);
+    collectThreeColumns(
+      colaboradores, "custos_empresa", agregadoPorItem, rankingPorItem,
+      undefined, ["beneficios"],
+    );
     consolidateByCategory(
       agregadoPorItem,
       rankingPorItem,
