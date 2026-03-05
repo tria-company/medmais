@@ -65,12 +65,12 @@ const PROVENTO_CATEGORIES: { category: string; test: (n: string) => boolean }[] 
 const CUSTOS_EMPRESA_CATEGORIES: { category: string; test: (n: string) => boolean }[] = [
   { category: "Plano Ambulatorial", test: (n) => /PLANO\s*AMBULAT/i.test(n) },
   { category: "Assistência Odontológica", test: (n) => /ODONTOL[OÓ]G/i.test(n) },
-  { category: "Seguro de Vida / Assistência Funeral", test: (n) => /FUNERAL|SEGURO\s*VIDA/i.test(n) },
-  { category: "Vale Alimentação", test: (n) => /VALE\s*ALIMENT|ALIMENTA[CÇ][AÃ]O\s*EMPRESA/i.test(n) },
+  { category: "Seguro de Vida / Assistência Funeral", test: (n) => /FUNERAL|SEGURO.*VIDA/i.test(n) },
+  { category: "Vale Alimentação", test: (n) => /VALE\s*ALIMENT|AUX[IÍ]LIO\s*ALIMENTA|ALIMENTA[CÇ][AÃ]O/i.test(n) },
   { category: "Vale Transporte", test: (n) => /VALE\s*TRANSP/i.test(n) },
   { category: "Auxílio Lazer/Cultura", test: (n) => /LAZER|CULTURA/i.test(n) },
   { category: "Assistência Médica", test: (n) => /ASSIST\.?\s*MED/i.test(n) },
-  { category: "Vale Refeição", test: (n) => /VALE\s*REFEI|REFEI[CÇ][AÃ]O\s*EMPRESA/i.test(n) },
+  { category: "Vale Refeição", test: (n) => /VALE\s*REFEI|AUX[IÍ]LIO\s*REFEI|REFEI[CÇ][AÃ]O/i.test(n) },
 ];
 
 const DESCONTO_CATEGORIES: { category: string; test: (n: string) => boolean }[] = [
