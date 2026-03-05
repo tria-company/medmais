@@ -148,7 +148,7 @@ export function ColaboradoresBarsChart({
             comparacaoTotais={selecionado.comparacaoTotais}
             showKpis={false}
             contratoPorItem={computeContratoTotaisFromFolha(
-              selecionado.folhaCctContrato,
+              selecionado.folhaContrato,
             )}
             colaboradores={[selecionado]}
             enableDetalhes={false}

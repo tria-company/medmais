@@ -42,7 +42,7 @@ export default async function Home() {
 
   for (const colaborador of visaoColaboradores) {
     const totaisContrato = computeContratoTotaisFromFolha(
-      colaborador.folhaCctContrato,
+      colaborador.folhaContrato,
     );
 
     (Object.keys(totaisContrato) as ComparacaoItemLabel[]).forEach((chave) => {

@@ -1,8 +1,4 @@
-import type {
-  FolhaCctContrato,
-  FolhaCctValorItem,
-  FolhaCctContratoDiscrepanciaItem,
-} from "@/lib/supabase/types";
+import type { FolhaCct } from "@/lib/supabase/types";
 
 export type ComparacaoItemLabel =
   | "Total Proventos"
@@ -12,72 +8,34 @@ export type ComparacaoItemLabel =
   | "Líquido Funcionário"
   | "Custo Total Empresa";
 
-function sumCategoriaContrato(
-  itensCategoria: FolhaCctValorItem[] | undefined,
-  discrepancias: Map<string, FolhaCctContratoDiscrepanciaItem>,
-): number {
-  if (!itensCategoria?.length) return 0;
-
-  return itensCategoria.reduce((total, item) => {
-    const disc = discrepancias.get(item.item);
-    const valorContrato =
-      disc && typeof disc.valor_contrato === "number"
-        ? disc.valor_contrato
-        : item.valor ?? 0;
-
-    return total + (Number.isFinite(valorContrato) ? valorContrato : 0);
-  }, 0);
-}
-
+/**
+ * Lê os totais do contrato diretamente de `folha_contrato.totais`.
+ * Anteriormente, esta função tentava computar valores a partir de
+ * discrepâncias do `folha_cct_contrato` (coluna removida do banco).
+ * Agora usamos a coluna `folha_contrato` que já possui os totais prontos.
+ */
 export function computeContratoTotaisFromFolha(
-  folha: FolhaCctContrato | null | undefined,
+  folhaContrato: FolhaCct | null | undefined,
 ): Record<ComparacaoItemLabel, number> {
-  if (!folha?.folha_cct) {
-    return {
-      "Total Proventos": 0,
-      "Total Descontos": 0,
-      "Total Encargos": 0,
-      "Total Custos Empresa": 0,
-      "Líquido Funcionário": 0,
-      "Custo Total Empresa": 0,
-    };
-  }
+  const zero: Record<ComparacaoItemLabel, number> = {
+    "Total Proventos": 0,
+    "Total Descontos": 0,
+    "Total Encargos": 0,
+    "Total Custos Empresa": 0,
+    "Líquido Funcionário": 0,
+    "Custo Total Empresa": 0,
+  };
 
-  const discrepanciasMap = new Map<string, FolhaCctContratoDiscrepanciaItem>();
-  for (const disc of folha.discrepancias?.itens ?? []) {
-    if (disc && typeof disc.valor_contrato === "number") {
-      discrepanciasMap.set(disc.item, disc);
-    }
-  }
+  if (!folhaContrato?.totais) return zero;
 
-  const totalProventos = sumCategoriaContrato(
-    folha.folha_cct.proventos,
-    discrepanciasMap,
-  );
-  const totalDescontos = sumCategoriaContrato(
-    folha.folha_cct.descontos,
-    discrepanciasMap,
-  );
-  const totalEncargos = sumCategoriaContrato(
-    folha.folha_cct.encargos,
-    discrepanciasMap,
-  );
-  const totalCustosEmpresa = sumCategoriaContrato(
-    folha.folha_cct.custos_empresa,
-    discrepanciasMap,
-  );
-
-  const liquidoFuncionario = totalProventos - totalDescontos;
-  const custoTotalEmpresa =
-    totalProventos - totalDescontos + totalEncargos + totalCustosEmpresa;
+  const t = folhaContrato.totais;
 
   return {
-    "Total Proventos": totalProventos,
-    "Total Descontos": totalDescontos,
-    "Total Encargos": totalEncargos,
-    "Total Custos Empresa": totalCustosEmpresa,
-    "Líquido Funcionário": liquidoFuncionario,
-    "Custo Total Empresa": custoTotalEmpresa,
+    "Total Proventos": t.total_proventos ?? 0,
+    "Total Descontos": t.total_descontos ?? 0,
+    "Total Encargos": t.total_encargos ?? 0,
+    "Total Custos Empresa": t.total_custos_empresa ?? 0,
+    "Líquido Funcionário": t.liquido ?? 0,
+    "Custo Total Empresa": t.custo_total_empresa ?? 0,
   };
 }
-

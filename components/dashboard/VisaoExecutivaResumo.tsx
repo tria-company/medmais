@@ -112,10 +112,7 @@ export function VisaoExecutivaResumo({
 
     return {
       cardKey: itemNome,
-      label:
-        itemNome === "Total Custos Empresa"
-          ? "Custo Total Benefícios"
-          : itemNome,
+      label: itemNome,
       valorAtual: valorAtualBase,
       valorContrato:
         fromDetalhes?.valorContrato ??
